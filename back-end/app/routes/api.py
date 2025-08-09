@@ -1,0 +1,289 @@
+from flask import Blueprint, jsonify, request
+from app import db
+from app.models.financial import FinancialStatement, KPIMetric, CurryHouse 
+from datetime import datetime
+from sqlalchemy import text
+from run_report_data import query_investment_data,populate_from_csv
+from flask import send_file
+import os
+
+api = Blueprint('files', __name__, url_prefix='/api')
+
+# GET: Retrieve all financial statements
+@api.route('/statements', methods=['GET'])
+def get_statements():
+    try:
+        statements = FinancialStatement.query.all()
+        return jsonify({
+            'success': True,
+            'data': [stmt.to_dict() for stmt in statements],
+            'count': len(statements)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# GET: Retrieve KPI metrics for a specific statement
+@api.route('/statements/<int:statement_id>/kpis', methods=['GET'])
+def get_kpis(statement_id):
+    try:
+        kpis = KPIMetric.query.filter_by(statement_id=statement_id).all()
+        return jsonify({
+            'success': True,
+            'data': [kpi.to_dict() for kpi in kpis],
+            'count': len(kpis)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# POST: Add a new financial statement
+@api.route('/statements', methods=['POST'])
+def add_statement():
+    try:
+        data = request.get_json()
+        
+        new_statement = FinancialStatement(
+            file_name=data.get('file_name'),
+            company_name=data.get('company_name'),
+            period_start=datetime.strptime(data.get('period_start'), '%Y-%m-%d').date() if data.get('period_start') else None,
+            period_end=datetime.strptime(data.get('period_end'), '%Y-%m-%d').date() if data.get('period_end') else None,
+            statement_type=data.get('statement_type')
+        )
+        
+        db.session.add(new_statement)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Financial statement added successfully',
+            'data': new_statement.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# POST: Add a new KPI metric
+@api.route('/kpis', methods=['POST'])
+def add_kpi():
+    try:
+        data = request.get_json()
+        
+        new_kpi = KPIMetric(
+            statement_id=data.get('statement_id'),
+            metric_name=data.get('metric_name'),
+            metric_value=data.get('metric_value'),
+            metric_category=data.get('metric_category')
+        )
+        
+        db.session.add(new_kpi)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'KPI metric added successfully',
+            'data': new_kpi.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# GET: Dashboard summary data
+@api.route('/dashboard', methods=['GET'])
+def dashboard_summary():
+    try:
+        total_statements = FinancialStatement.query.count()
+        total_kpis = KPIMetric.query.count()
+        
+        # Get recent statements
+        recent_statements = FinancialStatement.query.order_by(
+            FinancialStatement.upload_date.desc()
+        ).limit(5).all()
+        
+        # Get profitability KPIs
+        profit_kpis = KPIMetric.query.filter_by(
+            metric_category='profitability'
+        ).limit(5).all()
+        
+        return jsonify({
+            'success': True,
+            'summary': {
+                'total_statements': total_statements,
+                'total_kpis': total_kpis,
+                'recent_statements': [stmt.to_dict() for stmt in recent_statements],
+                'recent_kpis': [kpi.to_dict() for kpi in profit_kpis]
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api.route('/restaurants', methods=['GET'])
+def get_curry_house():
+    try:
+        # Debug: Check if table exists before querying
+        table_check = db.session.execute(text("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'andrews_curry'
+        """)).fetchone()
+        
+        if not table_check:
+            return jsonify({'error': 'andrews_curry table not found'}), 500
+        
+        print("Table exists, attempting query...")    
+        statements = CurryHouse.query.all()
+        print(f"Query successful, found {len(statements)} records")
+        
+        return jsonify({
+            'success': True,
+            'data': [stmt.to_dict() for stmt in statements],
+            'count': len(statements)
+        })
+    except Exception as e:
+        print(f"Error in get_curry_house: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api.route('/restaurants/<int:restaurant_id>', methods=['DELETE'])
+def delete_curry_house(restaurant_id):
+    try:
+        # Find the restaurant by ID
+        restaurant = CurryHouse.query.get(restaurant_id)
+        
+        if not restaurant:
+            return jsonify({
+                'success': False, 
+                'error': 'Restaurant not found'
+            }), 404
+        
+        # Delete the restaurant
+        db.session.delete(restaurant)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Restaurant with ID {restaurant_id} deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()  # Important: rollback on error
+        return jsonify({
+            'success': False, 
+            'error': str(e)
+        }), 500
+    
+
+@api.route('/curry', methods=['POST'])
+def add_curry_house():
+    try:
+        data = request.get_json()
+        
+        new_statement = CurryHouse(
+            name=data.get('restaurant'),
+            location=data.get('location'),
+            website=data.get('website'),
+            score=data.get('score')
+        )
+
+        
+        
+        db.session.add(new_statement)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Curry House added successfully',
+            'data': new_statement.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+import os
+from flask import jsonify
+
+
+
+@api.route('/investment-files', methods=['GET'])
+def get_investment_files():
+    try:
+        directory = r'C:\Users\AndrewKnott\Projects\Investments'
+        files = []
+        
+        if os.path.exists(directory):
+            for filename in os.listdir(directory):
+                if filename.endswith('.csv'):
+                    files.append({
+                        'name': filename,
+                        'path': os.path.join(directory, filename)
+                    })
+        
+        return jsonify({
+            'success': True,
+            'files': files,
+            'count': len(files)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500  
+
+@api.route('/process-investment', methods=['POST'])
+def process_investment_file():
+    try:
+        data = request.get_json()
+        selected_file = data.get('filename')
+        portfolio_name = data.get('portfolio', 'Shares')
+        
+        if not selected_file:
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        # Build full path
+        full_path = f'C:/Users/AndrewKnott/Projects/Investments/{selected_file}'
+        
+        # Use your existing function - it already does everything
+        from populate_data import populate_from_csv
+        populate_from_csv(full_path, portfolio_name)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully processed {selected_file}',
+            'data': {
+                'file_processed': selected_file,
+                'portfolio': portfolio_name
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
+
+@api.route('/generate-pdf', methods=['GET'])
+def generate_pdf_report():
+    try:
+        print("Generating PDF from database data...")
+        
+        # Specify full path for PDF
+        pdf_filename = f"investment_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        pdf_full_path = os.path.join(r'C:\Users\AndrewKnott\Projects\Investments', pdf_filename)
+        
+        from run_report_data import generate_pdf_from_sql_data
+        pdf_path = generate_pdf_from_sql_data(pdf_full_path)  # Pass full path
+        
+        print(f"PDF generated at: {pdf_path}")  # Debug print
+        
+        # Check if file exists
+        if not os.path.exists(pdf_path):
+            raise FileNotFoundError(f"PDF was not created at {pdf_path}")
+        
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=pdf_filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        print(f"Error generating PDF: {str(e)}")
+        import traceback
+        traceback.print_exc()  # This will show the full error
+        return jsonify({'success': False, 'error': str(e)}), 500
+

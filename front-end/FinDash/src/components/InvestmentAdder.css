@@ -1,0 +1,16 @@
+.select-screen *{
+    display: flex;
+    flex-direction: column;
+    /* width: 400px;
+    height: 600px; */
+    justify-content: center; 
+    gap:20px;
+    background-color: rgb(235, 235, 238);
+    color: rgb(17, 93, 96);
+    margin: 10px;
+}
+
+.select-screen select{
+    height: 30px;
+
+}
