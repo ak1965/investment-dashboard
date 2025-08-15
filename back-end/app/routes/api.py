@@ -229,32 +229,56 @@ def get_investment_files():
 @api.route('/process-investment', methods=['POST'])
 def process_investment_file():
     try:
+        print("=== Starting process_investment_file ===")
         data = request.get_json()
+        print(f"Received data: {data}")
+        
         selected_file = data.get('filename')
         portfolio_name = data.get('portfolio', 'Shares')
+        selected_date_str = data.get('date')
+        
+        print(f"Filename: {selected_file}")
+        print(f"Portfolio: {portfolio_name}")
+        print(f"Date string: {selected_date_str}")
         
         if not selected_file:
             return jsonify({'success': False, 'error': 'No file selected'}), 400
         
+        if not selected_date_str:
+            return jsonify({'success': False, 'error': 'No date selected'}), 400
+        
+        # Convert string date to date object
+        from datetime import datetime
+        selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+        print(f"Parsed date: {selected_date}")
+        
         # Build full path
         full_path = f'C:/Users/AndrewKnott/Projects/Investments/{selected_file}'
+        print(f"Full path: {full_path}")
         
-        # Use your existing function - it already does everything
+        # Import and call function
         from populate_data import populate_from_csv
-        populate_from_csv(full_path, portfolio_name)
+        print("About to call populate_from_csv")
+        populate_from_csv(full_path, portfolio_name, selected_date)
+        print("populate_from_csv completed successfully")
         
         return jsonify({
             'success': True,
             'message': f'Successfully processed {selected_file}',
             'data': {
                 'file_processed': selected_file,
-                'portfolio': portfolio_name
+                'portfolio': portfolio_name,
+                'date_processed': selected_date_str
             }
         })
         
     except Exception as e:
+        print(f"ERROR in process_investment_file: {str(e)}")
+        print(f"ERROR type: {type(e).__name__}")
+        import traceback
+        print("Full traceback:")
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
-    
 
 @api.route('/generate-pdf', methods=['GET'])
 def generate_pdf_report():

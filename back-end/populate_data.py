@@ -3,11 +3,21 @@ from datetime import datetime
 from app import create_app, db
 from app.models.financial import Investments
 
-def populate_from_csv(full_path, portfolio_name):
+def populate_from_csv(full_path, portfolio_name,selected_date):
     app = create_app()
     
     with app.app_context():
         # Skip the first 10 rows
+        # Convert the date string to a datetime object if needed
+        if isinstance(selected_date, str):
+            try:
+                # Assuming the frontend sends YYYY-MM-DD format
+                date_obj = datetime.strptime(selected_date, '%Y-%m-%d').date()
+            except ValueError:
+                # Try ISO format if the above fails
+                date_obj = datetime.fromisoformat(selected_date.replace('Z', '+00:00')).date()
+        else:
+            date_obj = selected_date
         
         with open(full_path, 'r') as file:
             for _ in range(10):
@@ -33,7 +43,7 @@ def populate_from_csv(full_path, portfolio_name):
                     units=clean_numeric(row['Units held']),
                     cost=clean_numeric(row['Cost (£)']),
                     value=clean_numeric(row['Value (£)']),
-                    date_of_valuation=datetime.now(),
+                    date_of_valuation=selected_date,
                     portfolio= portfolio_name
                 )
                 

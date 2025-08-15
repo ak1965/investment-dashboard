@@ -1,16 +1,278 @@
-.select-screen *{
-    display: flex;
-    flex-direction: column;
-    /* width: 400px;
-    height: 600px; */
-    justify-content: center; 
-    gap:20px;
-    background-color: rgb(235, 235, 238);
-    color: rgb(17, 93, 96);
-    margin: 10px;
+/* Scoped CSS - Only affects Investment Adder, not calendar component */
+
+/* Only target the main investment container */
+.investment-page {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+    margin: 0;
 }
 
-.select-screen select{
-    height: 30px;
+/* Main form container - scoped specifically */
+.investment-form-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+}
 
+/* Only target h2 inside investment container */
+.investment-form-container h2 {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+    margin-bottom: 30px;
+    text-align: center;
+    font-size: 2.5rem;
+}
+
+/* Only target home link inside investment container */
+.investment-home-link {
+    display: inline-block;
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 25px;
+    background: rgba(102, 126, 234, 0.1);
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.investment-home-link:hover {
+    background: rgba(102, 126, 234, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Form layout - specific class */
+.investment-form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+/* Form group wrapper - won't affect calendar */
+.investment-form-group {
+    position: relative;
+}
+
+/* Only target labels inside form groups */
+.investment-form-group > label {
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 8px;
+    display: block;
+    font-size: 1.1rem;
+}
+
+/* Only target direct select and input children */
+.investment-form-group > select,
+.investment-form-group > input[type="text"] {
+    width: 100%;
+    padding: 15px 20px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 16px;
+    background: white;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Make calendar picker same width as other inputs */
+.investment-form-group > div {
+    width: 100%;
+}
+
+.investment-form-group [style*="position: relative"] {
+    max-width: none !important;
+    width: 100% !important;
+}
+
+/* Also target the button inside the calendar */
+.investment-form-group [style*="position: relative"] button {
+    width: 100% !important;
+}
+
+/* Make the calendar dropdown wider when it opens */
+.investment-form-group [style*="position: absolute"] {
+    width: 500px !important;
+    max-width: none !important;
+}
+
+/* Alternative - target calendar dropdown more specifically */
+div[style*="position: absolute"][style*="z-index: 1000"] {
+    width: 500px !important;
+    max-width: 500px !important;
+}
+
+/* Fix calendar header spacing */
+.investment-form-group [style*="position: absolute"] button[style*="background"] {
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    white-space: nowrap !important;
+    min-width: 80px !important;
+}
+
+/* Fix calendar month/year title */
+.investment-form-group [style*="position: absolute"] h3 {
+    font-size: 18px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+}
+
+/* Fix calendar header layout */
+.investment-form-group [style*="position: absolute"] div[style*="display: flex"] {
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.investment-form-group > select:focus,
+.investment-form-group > input[type="text"]:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    transform: translateY(-2px);
+}
+
+.investment-form-group > select:hover,
+.investment-form-group > input[type="text"]:hover {
+    border-color: #cbd5e0;
+    transform: translateY(-1px);
+}
+
+/* Button styles - very specific selector */
+.investment-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.investment-btn {
+    flex: 1;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden;
+}
+
+.investment-btn-process {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    box-shadow: 0 8px 25px rgba(79, 172, 254, 0.3);
+}
+
+.investment-btn-process:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(79, 172, 254, 0.4);
+}
+
+.investment-btn-pdf {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    color: white;
+    box-shadow: 0 8px 25px rgba(250, 112, 154, 0.3);
+}
+
+.investment-btn-pdf:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(250, 112, 154, 0.4);
+}
+
+.investment-btn:disabled {
+    background: linear-gradient(135deg, #a0aec0 0%, #cbd5e0 100%) !important;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+    animation: investmentPulse 1.5s infinite;
+}
+
+/* Selected date display */
+.investment-selected-date {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    padding: 15px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    color: #2d3748;
+    text-align: center;
+    border-left: 4px solid #667eea;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    margin: 0;
+}
+
+/* Hover effect for form groups */
+.investment-form-group::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+    transform: scale(1.02);
+}
+
+.investment-form-group:hover::before {
+    opacity: 0.05;
+}
+
+/* Glowing border animation */
+.investment-form-container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #667eea, #764ba2, #667eea);
+    border-radius: 22px;
+    z-index: -1;
+    animation: investmentBorderGlow 3s linear infinite;
+    opacity: 0.6;
+    background-size: 200% 200%;
+}
+
+/* Animations with unique names */
+@keyframes investmentPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+@keyframes investmentBorderGlow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .investment-form-container {
+        padding: 20px;
+        margin: 10px;
+    }
+    
+    .investment-form-container h2 {
+        font-size: 2rem;
+    }
+    
+    .investment-buttons {
+        flex-direction: column;
+    }
 }
