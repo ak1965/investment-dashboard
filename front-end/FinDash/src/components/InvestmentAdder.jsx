@@ -9,7 +9,7 @@ export default function InvestmentAdder() {
     const [selectedFile, setSelectedFile] = useState('');
     const [portfolioName, setPortfolioName] = useState('');
     const [processing, setProcessing] = useState(false);
-    const [generatingPdf, setGeneratingPdf] = useState(false);
+    
     const [selectedDate, setSelectedDate] = useState(null); // Add this for calendar
 
     useEffect(() => {
@@ -83,38 +83,7 @@ export default function InvestmentAdder() {
         }
     };
 
-    const handleGeneratePdf = async () => {
-        console.log("Starting PDF generation...");
-        setGeneratingPdf(true);
-        
-        try {
-            console.log("Fetching from:", 'http://localhost:5000/api/generate-pdf');
-            
-            const response = await fetch('http://localhost:5000/api/generate-pdf', {
-                method: 'GET',
-            });
-            
-            console.log("Response received:", response);
-            console.log("Response status:", response.status);
-            console.log("Response headers:", response.headers);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const blob = await response.blob();
-            console.log("Blob created:", blob);
-            
-            const url = window.URL.createObjectURL(blob);
-            window.open(url, '_blank');
-            
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            alert('Error generating PDF: ' + error.message);
-        } finally {
-            setGeneratingPdf(false);
-        }
-    };
+    
 
     if (loading) {
         return <p>Loading files...</p>;
@@ -172,13 +141,7 @@ export default function InvestmentAdder() {
                         {processing ? 'Processing...' : 'Process File'}
                     </button>
                     
-                    <button 
-                        className="investment-btn investment-btn-pdf"
-                        onClick={handleGeneratePdf} 
-                        disabled={generatingPdf}
-                    >
-                        {generatingPdf ? 'Generating...' : 'Generate PDF Report'}
-                    </button>
+                    
                 </div>
             </div>
         </div>

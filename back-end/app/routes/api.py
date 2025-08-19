@@ -6,8 +6,9 @@ from sqlalchemy import text
 from run_report_data import query_investment_data,populate_from_csv
 from flask import send_file
 import os
+from app.models.financial import Investments
 
-api = Blueprint('files', __name__, url_prefix='/api')
+api = Blueprint('api', __name__, url_prefix='/api')
 
 # GET: Retrieve all financial statements
 @api.route('/statements', methods=['GET'])
@@ -280,19 +281,230 @@ def process_investment_file():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# @api.route('/generate-pdf', methods=['GET'])
+# def generate_pdf_report():
+#     try:
+#         print("Generating PDF from database data...")
+        
+#         # Specify full path for PDF
+#         pdf_filename = f"investment_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+#         pdf_full_path = os.path.join(r'C:\Users\AndrewKnott\Projects\Investments', pdf_filename)
+        
+#         from run_report_data import generate_pdf_from_sql_data
+#         pdf_path = generate_pdf_from_sql_data(pdf_full_path)  # Pass full path
+        
+#         print(f"PDF generated at: {pdf_path}")  # Debug print
+        
+#         # Check if file exists
+#         if not os.path.exists(pdf_path):
+#             raise FileNotFoundError(f"PDF was not created at {pdf_path}")
+        
+#         return send_file(
+#             pdf_path,
+#             as_attachment=True,
+#             download_name=pdf_filename,
+#             mimetype='application/pdf'
+#         )
+        
+#     except Exception as e:
+#         print(f"Error generating PDF: {str(e)}")
+#         import traceback
+#         traceback.print_exc()  # This will show the full error
+#         return jsonify({'success': False, 'error': str(e)}), 500
+    
+@api.route('/investment-history/<string:company_name>', methods=['GET'])
+def get_investment_history(company_name):
+    try:
+        # Query your database for the specific company's valuations over time
+        history = db.session.query(
+            Investments.date_of_valuation,
+            Investments.value
+        ).filter(
+            Investments.investment == company_name
+        ).order_by(
+            Investments.date_of_valuation
+        ).all()
+        
+        # Format the data for the frontend
+        formatted_data = []
+        for record in history:
+            # Handle both datetime and date objects
+            if hasattr(record.date_of_valuation, 'date'):
+                # It's a datetime object
+                date_str = record.date_of_valuation.date().strftime('%Y-%m-%d')
+            else:
+                # It's already a date object
+                date_str = record.date_of_valuation.strftime('%Y-%m-%d')
+            
+            formatted_data.append({
+                'date': date_str,
+                'value': float(record.value) if record.value else 0
+            })
+        
+        return jsonify({
+            'success': True,
+            'company': company_name,
+            'data': formatted_data
+        })
+        
+    except Exception as e:
+        print(f"Error in get_investment_history: {e}")  # Debug line
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@api.route('/companies', methods=['GET'])
+def get_companies():
+    try:
+        # Get unique company names from your investments table
+        companies = db.session.query(Investments.investment).distinct().all()
+        
+        # Extract company names from query result
+        company_list = [company[0] for company in companies if company[0]]
+        
+        return jsonify({
+            'success': True,
+            'companies': sorted(company_list)  # Sort alphabetically
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@api.route('/stock-data/<string:symbol>', methods=['GET'])
+def get_stock_data(symbol):
+    try:
+        # Your Alpha Vantage API key
+        api_key = "153TPL2JUDBYVGSH"  # Replace with your actual key
+        
+        # Optional: Get period from query parameters (default to 100 days)
+        outputsize = request.args.get('outputsize', 'compact')  # 'compact' or 'full'
+        
+        # Alpha Vantage API URL
+        url = f"https://www.alphavantage.co/query"
+        params = {
+            'function': 'TIME_SERIES_DAILY',
+            'symbol': symbol,
+            'outputsize': outputsize,
+            'apikey': api_key
+        }
+        
+        print(f"Fetching stock data for: {symbol}")
+        
+        # Make API request
+        response = requests.get(url, params=params)
+        data = response.json()
+        
+        # Check for API errors
+        if "Error Message" in data:
+            return jsonify({
+                'success': False, 
+                'error': f'Invalid symbol: {symbol}'
+            }), 400
+        
+        if "Note" in data:
+            return jsonify({
+                'success': False, 
+                'error': 'API rate limit exceeded. Try again in a minute.'
+            }), 429
+        
+        # Extract time series data
+        time_series_key = "Time Series (Daily)"
+        if time_series_key not in data:
+            return jsonify({
+                'success': False, 
+                'error': 'No data available for this symbol'
+            }), 404
+        
+        time_series = data[time_series_key]
+        
+        # Format data for frontend
+        formatted_data = []
+        for date_str, daily_data in time_series.items():
+            formatted_data.append({
+                'date': date_str,
+                'open': float(daily_data['1. open']),
+                'high': float(daily_data['2. high']),
+                'low': float(daily_data['3. low']),
+                'close': float(daily_data['4. close']),
+                'volume': int(daily_data['5. volume'])
+            })
+        
+        # Sort by date (newest first)
+        formatted_data.sort(key=lambda x: x['date'], reverse=True)
+        
+        # Get metadata
+        metadata = data.get("Meta Data", {})
+        
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'data': formatted_data,
+            'metadata': {
+                'symbol': metadata.get('2. Symbol', symbol),
+                'last_refreshed': metadata.get('3. Last Refreshed', ''),
+                'timezone': metadata.get('5. Time Zone', 'US/Eastern')
+            },
+            'count': len(formatted_data)
+        })
+        
+    except requests.RequestException as e:
+        return jsonify({
+            'success': False, 
+            'error': f'API request failed: {str(e)}'
+        }), 500
+    except Exception as e:
+        print(f"Error in get_stock_data: {e}")
+        return jsonify({
+            'success': False, 
+            'error': str(e)
+        }), 500
+    
+# Add this new endpoint to your Flask API
+@api.route('/unique-dates', methods=['GET'])
+def get_unique_dates():
+    """
+    Returns unique valuation dates from the investments table
+    """
+    try:
+        # Query to get unique dates, ordered by date descending (most recent first)
+        unique_dates = db.session.query(
+            db.func.date(Investments.date_of_valuation).label('date')
+        ).distinct().order_by(
+            db.func.date(Investments.date_of_valuation).desc()
+        ).all()
+        
+        # Convert to list of date strings
+        dates_list = [date.date.strftime('%Y-%m-%d') for date in unique_dates]
+        
+        return jsonify({
+            'success': True,
+            'dates': dates_list
+        })
+        
+    except Exception as e:
+        print(f"Error fetching unique dates: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# Update your existing generate-pdf endpoint to accept date parameter
 @api.route('/generate-pdf', methods=['GET'])
 def generate_pdf_report():
     try:
-        print("Generating PDF from database data...")
+        # Get optional date parameter
+        selected_date = request.args.get('date')  # Format: YYYY-MM-DD
+        
+        print(f"Generating PDF from database data for date: {selected_date or 'all dates'}...")
         
         # Specify full path for PDF
-        pdf_filename = f"investment_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        date_suffix = f"_{selected_date}" if selected_date else "_all"
+        pdf_filename = f"investment_report{date_suffix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         pdf_full_path = os.path.join(r'C:\Users\AndrewKnott\Projects\Investments', pdf_filename)
         
         from run_report_data import generate_pdf_from_sql_data
-        pdf_path = generate_pdf_from_sql_data(pdf_full_path)  # Pass full path
         
-        print(f"PDF generated at: {pdf_path}")  # Debug print
+        # Pass the selected date to the PDF generation function
+        pdf_path = generate_pdf_from_sql_data(pdf_full_path, selected_date=selected_date)
+        
+        print(f"PDF generated at: {pdf_path}")
         
         # Check if file exists
         if not os.path.exists(pdf_path):
@@ -308,6 +520,6 @@ def generate_pdf_report():
     except Exception as e:
         print(f"Error generating PDF: {str(e)}")
         import traceback
-        traceback.print_exc()  # This will show the full error
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 

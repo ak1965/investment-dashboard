@@ -44,6 +44,16 @@ function Navigation() {
             <Link to="/investment" className="nav-link" onClick={toggleMenu}>
               Add Investment Statement
             </Link>
+            <Link to="/investment-chart" className="nav-link" onClick={toggleMenu}>
+              Generate Investment Reports
+            </Link>
+            <Link to="/stock-performance" className="nav-link" onClick={toggleMenu}>
+              Stock Performance
+            </Link>
+             <Link to="/reports" className="nav-link" onClick={toggleMenu}>
+              Portfolio report
+            </Link>
+
           </li>
         </ul>
       </div>

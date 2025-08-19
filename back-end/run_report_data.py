@@ -86,90 +86,111 @@ def import_csv_to_database(filename, portfolio_name):
 
 
 
-def query_investment_data():
+def query_investment_data(selected_date=None):
     """
-    Get investment data using raw SQL - with proper text() wrapper
+    Query investment data from database with optional date filter
+    
+    Args:
+        selected_date: Date filter in YYYY-MM-DD format (optional)
+    
+    Returns:
+        tuple: (investment_data, totals)
     """
-    app = create_app()
+    # Import your database and model - adjust these imports to match your actual structure
+    # Look at your existing working imports in your Flask app and copy them here
+   
     
-    
-    with app.app_context():        
-       
-        raw_sql = text("""
-        SELECT 
+    try:
+        # Build base query
+        query = db.session.query(Investments)
+        
+        # Apply date filter if provided
+        if selected_date:
+            # Convert string date to datetime for comparison
+            from datetime import datetime
+            target_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
             
-            investment as stock_name,
-            SUM(units) as total_units,
-            SUM(cost) as total_cost,
-            SUM(value) as total_value,
-            (SUM(value) - SUM(cost)) as profit_pounds,
-            ((SUM(value) - SUM(cost)) / SUM(cost)) * 100 as percent_return
-        FROM investments 
-        GROUP BY investment
-        ORDER BY profit_pounds DESC
-        """)
+            # Filter by date (assuming date_of_valuation is stored as datetime)
+            query = query.filter(
+                db.func.date(Investments.date_of_valuation) == target_date
+            )
         
-        results = db.session.execute(raw_sql).fetchall()
+        # Execute query
+        investments = query.all()
         
-        # print("=== INVESTMENT SUMMARY ===")
-        # print(f"{'Stock':<40} {'Units':<10} {'Cost (£)':<12} {'Value (£)':<12} {'Profit (£)':<12} {'Return %':<10}")
-        # print("-" * 100)
+        # Group by investment name and sum up units, costs, and values
+        investment_dict = {}
         
-        # Convert results to list of dictionaries for easy handling
-        data = []
-        total_cost_all = 0
-        total_value_all = 0
-        
-        for result in results:
-            stock_data = {
-                
-                'stock_name': result.stock_name,
-                'total_units': float(result.total_units or 0),
-                'total_cost': float(result.total_cost or 0),
-                'total_value': float(result.total_value or 0),
-                'profit_pounds': float(result.profit_pounds or 0),
-                'percent_return': float(result.percent_return or 0)
-            }
+        for inv in investments:
+            stock_name = inv.investment
+            cost = float(inv.cost or 0)
+            value = float(inv.value or 0)
+            units = float(inv.units or 0)
             
-            data.append(stock_data)
-            total_cost_all += stock_data['total_cost']
-            total_value_all += stock_data['total_value']
+            if stock_name not in investment_dict:
+                investment_dict[stock_name] = {
+                    'total_units': 0,
+                    'total_cost': 0,
+                    'total_value': 0
+                }
             
-            # Print to console
-            # print(f"{stock_data['stock_name'][:39]:<40} "
-            #       f"{stock_data['total_units']:>9.2f} "
-            #       f"{stock_data['total_cost']:>11.2f} "
-            #       f"{stock_data['total_value']:>11.2f} "
-            #       f"{stock_data['profit_pounds']:>11.2f} "
-            #       f"{stock_data['percent_return']:>8.2f}%")
+            investment_dict[stock_name]['total_units'] += units
+            investment_dict[stock_name]['total_cost'] += cost
+            investment_dict[stock_name]['total_value'] += value
         
-        # Calculate and print totals
-        total_profit_all = total_value_all - total_cost_all
-        total_return_all = (total_profit_all / total_cost_all * 100) if total_cost_all > 0 else 0
+        # Convert to list format and calculate profits/returns
+        investment_data = []
+        total_cost = 0
+        total_value = 0
         
-        # print("-" * 100)
-        # print(f"{'TOTALS':<40} "
-        #       f"{'':>10} "
-        #       f"{total_cost_all:>11.2f} "
-        #       f"{total_value_all:>11.2f} "
-        #       f"{total_profit_all:>11.2f} "
-        #       f"{total_return_all:>8.2f}%")
+        for stock_name, data in investment_dict.items():
+            cost = data['total_cost']
+            value = data['total_value']
+            profit = value - cost
+            percent_return = (profit / cost * 100) if cost > 0 else 0
+            
+            investment_data.append({
+                'stock_name': stock_name,
+                'total_units': data['total_units'],
+                'total_cost': cost,
+                'total_value': value,
+                'profit_pounds': profit,
+                'percent_return': percent_return
+            })
+            
+            total_cost += cost
+            total_value += value
         
-        return data, {
-            'total_cost': total_cost_all,
-            'total_value': total_value_all,
-            'total_profit': total_profit_all,
-            'total_return': total_return_all
+        # Calculate totals
+        total_profit = total_value - total_cost
+        total_return = (total_profit / total_cost * 100) if total_cost > 0 else 0
+        
+        totals = {
+            'total_cost': total_cost,
+            'total_value': total_value,
+            'total_profit': total_profit,
+            'total_return': total_return
         }
+        
+        return investment_data, totals
+        
+    except Exception as e:
+        print(f"Error querying investment data: {str(e)}")
+        raise
 
-def generate_pdf_from_sql_data(output_filename="investment_report.pdf", investment_data=None, totals=None):
+def generate_pdf_from_sql_data(output_filename="investment_report.pdf", investment_data=None, totals=None, selected_date=None):
     """
     Generate PDF report using the raw SQL data
-    """
-    # Get data from SQL query
-    if investment_data is None or totals is None:
-        investment_data, totals = query_investment_data()
     
+    Args:
+        output_filename: Name of the output PDF file
+        investment_data: Pre-fetched investment data (optional)
+        totals: Pre-calculated totals (optional)
+        selected_date: Date filter in YYYY-MM-DD format (optional)
+    """
+    # Get data from SQL query with optional date filter
+    if investment_data is None or totals is None:
+        investment_data, totals = query_investment_data(selected_date)
     
     # Create PDF
     doc = SimpleDocTemplate(output_filename, pagesize=A4)
@@ -185,8 +206,13 @@ def generate_pdf_from_sql_data(output_filename="investment_report.pdf", investme
         alignment=1  # Center
     )
     
-    # Title
-    title = Paragraph("Investment Portfolio Report", title_style)
+    # Title with date information
+    if selected_date:
+        title_text = f"Investment Portfolio Report - {selected_date}"
+    else:
+        title_text = "Investment Portfolio Report - All Dates"
+    
+    title = Paragraph(title_text, title_style)
     story.append(title)
     story.append(Spacer(1, 20))
     
@@ -205,7 +231,6 @@ def generate_pdf_from_sql_data(output_filename="investment_report.pdf", investme
     for item in investment_data:
         table_data.append([
             # Truncate long stock names for PDF
-            
             item['stock_name'][:35] + '...' if len(item['stock_name']) > 35 else item['stock_name'],
             f"{item['total_units']:,.1f}",
             f"{item['total_cost']:,.2f}",
@@ -278,8 +303,12 @@ def generate_pdf_from_sql_data(output_filename="investment_report.pdf", investme
     profitable_count = len([x for x in investment_data if x['profit_pounds'] > 0])
     losing_count = len([x for x in investment_data if x['profit_pounds'] < 0])
     
+    # Add date information to summary
+    date_info = f"Report Date: {selected_date}<br/>" if selected_date else "Report: All Historical Data<br/>"
+    
     summary_text = f"""
     <b>Portfolio Summary:</b><br/>
+    {date_info}
     Total Stocks: {len(investment_data)}<br/>
     Profitable: {profitable_count}<br/>
     Loss-making: {losing_count}<br/>
@@ -293,25 +322,10 @@ def generate_pdf_from_sql_data(output_filename="investment_report.pdf", investme
     # Build PDF
     doc.build(story)
     
-    # print(f"\nPDF Report Generated: {output_filename}")
-    # print(f"Portfolio Value: £{totals['total_value']:,.2f}")
-    # print(f"Total Profit/Loss: £{totals['total_profit']:,.2f}")
-    # print(f"Overall Return: {totals['total_return']:.2f}%")
-    
     return output_filename
 
-def just_run_sql_query():
-    """
-    If you just want to see the SQL results without PDF
-    """
-    investment_data, totals = query_investment_data()
-    
-    # print(f"\nSummary:")
-    # print(f"Total stocks: {len(investment_data)}")
-    # print(f"Best performer: {investment_data[0]['stock_name']} (£{investment_data[0]['profit_pounds']:.2f})")
-    # print(f"Worst performer: {investment_data[-1]['stock_name']} (£{investment_data[-1]['profit_pounds']:.2f})")
-    
-    return investment_data
+
+
 
 if __name__ == '__main__':
     # Option 1: Just run the SQL query and see results
