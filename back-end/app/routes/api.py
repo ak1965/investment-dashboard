@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app import db
-from app.models.financial import FinancialStatement, KPIMetric, CurryHouse 
+from app.models.financial import FinancialStatement, KPIMetric
 from datetime import datetime
 from sqlalchemy import text
 from run_report_data import query_investment_data,populate_from_csv

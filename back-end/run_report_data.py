@@ -191,6 +191,8 @@ def generate_pdf_from_sql_data(output_filename="investment_report.pdf", investme
     # Get data from SQL query with optional date filter
     if investment_data is None or totals is None:
         investment_data, totals = query_investment_data(selected_date)
+
+    investment_data = sorted(investment_data, key=lambda x: x['total_value'], reverse=True)
     
     # Create PDF
     doc = SimpleDocTemplate(output_filename, pagesize=A4)
